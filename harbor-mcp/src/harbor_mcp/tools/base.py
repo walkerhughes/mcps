@@ -10,6 +10,11 @@ def fmt(data: Any) -> str:
     return json.dumps(data, default=str, separators=(",", ":"))
 
 
+def compact(data: dict[str, Any]) -> dict[str, Any]:
+    """Drop None values so payloads stay small; falsy ints/strs/lists survive."""
+    return {k: v for k, v in data.items() if v is not None}
+
+
 def truncate(items: list[Any], limit: int) -> tuple[list[Any], str | None]:
     """Cap a list, returning (items, note). The note tells the model data was cut."""
     if limit <= 0 or len(items) <= limit:
