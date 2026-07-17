@@ -1,5 +1,6 @@
 """Read tools over the Harbor package registry: task and dataset versions."""
 
+from functools import cache
 from typing import Any
 
 from harbor.db.client import RegistryDB
@@ -9,14 +10,10 @@ from harbor_mcp.tools.base import compact, fmt, truncate
 
 DATASET_TASKS_CAP = 50
 
-_registry_instance: RegistryDB | None = None
 
-
+@cache
 def _registry() -> RegistryDB:
-    global _registry_instance
-    if _registry_instance is None:
-        _registry_instance = RegistryDB()
-    return _registry_instance
+    return RegistryDB()
 
 
 def _task_entry(row: dict[str, Any]) -> dict[str, Any] | None:

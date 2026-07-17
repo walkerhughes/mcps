@@ -3,6 +3,7 @@
 import uuid
 from collections import Counter
 from datetime import datetime
+from functools import cache
 from typing import Any
 
 from harbor.auth.client import require_user_id
@@ -18,23 +19,16 @@ JOB_ROWS_CAP = 100
 TRIAL_ROWS_CAP = 100
 MISSING_ARCHIVE_SAMPLE_CAP = 20
 
-_hub_instance: HubClient | None = None
-_upload_db_instance: UploadDB | None = None
 
-
+@cache
 def _hub() -> HubClient:
     """One HubClient per process: it caches its auth check across calls."""
-    global _hub_instance
-    if _hub_instance is None:
-        _hub_instance = HubClient()
-    return _hub_instance
+    return HubClient()
 
 
+@cache
 def _upload_db() -> UploadDB:
-    global _upload_db_instance
-    if _upload_db_instance is None:
-        _upload_db_instance = UploadDB()
-    return _upload_db_instance
+    return UploadDB()
 
 
 def _parse_uuid(value: str, param: str) -> uuid.UUID:
