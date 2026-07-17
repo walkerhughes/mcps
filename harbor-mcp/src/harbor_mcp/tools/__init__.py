@@ -2,7 +2,10 @@
 
 from typing import Any
 
+from harbor_mcp.tools import jobs, registry, writes
+
 
 def register_all(mcp: Any) -> None:
-    # Tool modules (jobs, registry, writes) register here as they land.
-    pass
+    jobs.register(mcp)
+    registry.register(mcp)
+    writes.register(mcp)
