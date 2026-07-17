@@ -7,6 +7,7 @@ permanent.
 """
 
 import uuid
+from functools import cache
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -15,49 +16,43 @@ from harbor_mcp.tools.base import fmt, writes_enabled
 
 _VISIBILITIES = ("public", "private")
 
-# Lazy client singletons. Constructing these imports heavy harbor internals,
-# so defer until a tool actually runs. Tests monkeypatch these accessors.
-_clients: dict[str, Any] = {}
 
-
+# Lazy client singletons: constructing these imports heavy harbor internals, so
+# defer until a tool runs. cache gives one instance per process; tests
+# monkeypatch these accessors.
+@cache
 def _uploader() -> Any:
-    if "uploader" not in _clients:
-        from harbor.upload.uploader import Uploader
+    from harbor.upload.uploader import Uploader
 
-        _clients["uploader"] = Uploader()
-    return _clients["uploader"]
+    return Uploader()
 
 
+@cache
 def _publisher() -> Any:
-    if "publisher" not in _clients:
-        from harbor.publisher.publisher import Publisher
+    from harbor.publisher.publisher import Publisher
 
-        _clients["publisher"] = Publisher()
-    return _clients["publisher"]
+    return Publisher()
 
 
+@cache
 def _downloader() -> Any:
-    if "downloader" not in _clients:
-        from harbor.download.downloader import Downloader
+    from harbor.download.downloader import Downloader
 
-        _clients["downloader"] = Downloader()
-    return _clients["downloader"]
+    return Downloader()
 
 
+@cache
 def _upload_db() -> Any:
-    if "upload_db" not in _clients:
-        from harbor.upload.db_client import UploadDB
+    from harbor.upload.db_client import UploadDB
 
-        _clients["upload_db"] = UploadDB()
-    return _clients["upload_db"]
+    return UploadDB()
 
 
+@cache
 def _hub_client() -> Any:
-    if "hub_client" not in _clients:
-        from harbor.hub.client import HubClient
+    from harbor.hub.client import HubClient
 
-        _clients["hub_client"] = HubClient()
-    return _clients["hub_client"]
+    return HubClient()
 
 
 def _writes_disabled() -> str | None:
