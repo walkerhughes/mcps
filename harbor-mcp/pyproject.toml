@@ -11,6 +11,11 @@ dependencies = [
     "mcp>=1.2",
 ]
 
+[project.optional-dependencies]
+# Only needed to run tests/evals with HARBOR_TEST_ENV=modal. Kept out of the
+# base install so read-only use stays lean. Install with: uv sync --extra modal.
+modal = ["harbor[modal]==0.18.0"]
+
 [project.scripts]
 harbor-mcp = "harbor_mcp.server:main"
 
