@@ -137,4 +137,11 @@ def test_register_all_registers_every_tool():
         "check_job_upload",
         "check_task_published",
         "resolve_dataset",
+        "upload_job",
+        "publish_task",
+        "publish_dataset",
+        "download_job",
+        "set_job_visibility",
+        "share_job",
+        "delete_job",
     ]
