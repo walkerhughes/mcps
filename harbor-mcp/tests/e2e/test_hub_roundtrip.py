@@ -60,6 +60,15 @@ def job_dir(tmp_path_factory) -> Path:
     result = d / "result.json"
     if not result.exists():
         pytest.fail(f"harbor run produced no result.json under {d}")
+    # Fail legibly if the environment could not run the trial (e.g. a modal
+    # image-build RemoteError) instead of letting a rewardless trial surface
+    # downstream. The job result carries success in stats, not trial_results.
+    stats = json.loads(result.read_text()).get("stats", {})
+    if stats.get("n_errored_trials") or not stats.get("n_completed_trials"):
+        pytest.fail(
+            f"oracle did not solve the fixture on env={test_env}; "
+            f"the harbor run reported no completed trial. stats={stats}"
+        )
     return d
 
 
@@ -103,7 +112,7 @@ async def test_upload_verify_download_delete_roundtrip(job_dir, tmp_path):
         trials = await call(session, "get_job_trials", job_id=job_id)
         rows = trials["trials"]
         assert len(rows) == 1
-        assert rows[0]["reward"] == 1
+        assert rows[0].get("reward") == 1, rows[0]
 
         detail = await call(session, "get_trial_detail", trial_id=rows[0]["id"])
         assert detail
