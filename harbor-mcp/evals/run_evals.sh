@@ -76,8 +76,11 @@ run_eval() {
         "$@"
     # harbor run exits 0 regardless of reward; gate on a perfect result so CI
     # (and `make evals`) fails the moment an eval regresses.
-    python3 "$REPO_ROOT/evals/check_reward.py" "$JOBS_DIR/$name/result.json" "$name" \
-        || die "$name did not reach reward 1.0"
+    if ! python3 "$REPO_ROOT/evals/check_reward.py" "$JOBS_DIR/$name/result.json" "$name"; then
+        echo "--- $name verifier output ---" >&2
+        cat "$JOBS_DIR/$name"/*/verifier/test-stdout.txt >&2 2>/dev/null || true
+        die "$name did not reach reward 1.0"
+    fi
 }
 
 run_eval read-job --ae EVAL_JOB_ID="$JOB_ID"

@@ -73,8 +73,11 @@ assert_eval() {
     local needs=$1 name=$2
     shift 2
     echo "==> $name: oracle must pass, nop must fail"
-    [ "$(perfect_for oracle "$needs" "$name" "$@")" = yes ] \
-        || die "$name: the ORACLE did not reach reward 1.0 (the eval is broken)"
+    if [ "$(perfect_for oracle "$needs" "$name" "$@")" != yes ]; then
+        echo "--- $name oracle verifier output ---" >&2
+        cat "$JOBS_DIR/oracle-$name/$name"/*/verifier/test-stdout.txt >&2 2>/dev/null || true
+        die "$name: the ORACLE did not reach reward 1.0 (the eval is broken)"
+    fi
     [ "$(perfect_for nop "$needs" "$name" "$@")" = no ] \
         || die "$name: the NOP agent reached reward 1.0 (the eval is trivially passable)"
     echo "==> $name: OK (oracle passed, nop failed)"

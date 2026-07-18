@@ -3,7 +3,9 @@ name: eval-safety
 # Runs only when the evals change: prove each eval is solvable by its oracle and
 # not trivially passable by a no-op agent. No LLM/Anthropic cost. This is NOT the
 # merge gate on the MCP capabilities (that is the `evals` job in ci.yml) -- it is
-# the safety net that keeps the evals themselves honest.
+# the safety net that keeps the evals themselves honest. It runs on both provider
+# environments the gate might use, so a provider-specific break surfaces here
+# (cheaply, with the oracle) before the expensive claude-code gate.
 on:
   pull_request:
     paths:
@@ -11,19 +13,25 @@ on:
 
 jobs:
   eval-safety:
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [docker, modal]
     runs-on: ubuntu-latest
     env:
       HARBOR_API_KEY: ${{ secrets.HARBOR_API_KEY }}
-      HARBOR_TEST_ENV: docker
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      HARBOR_TEST_ENV: ${{ matrix.provider }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
-      - run: uv sync --dev
+      - run: uv sync --dev --extra modal
       # run_eval_safety.sh calls the bare `harbor` console script from the venv.
       - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
-      - name: Run eval-safety (oracle + nop)
+      - name: Run eval-safety (oracle + nop, env=${{ matrix.provider }})
         run: |
           if [ -z "${HARBOR_API_KEY:-}" ]; then
             echo "HARBOR_API_KEY absent (fork PR?); skipping eval-safety."
