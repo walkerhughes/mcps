@@ -1,9 +1,10 @@
 version = "1.0"
 
+# Fixture, not an eval -- see README.md in this directory.
 [task]
-name = "harbor-mcp/e2e-hello"
+name = "harbor-mcp/hello-world"
 authors = []
-keywords = ["e2e-fixture"]
+keywords = ["hello-world", "fixture"]
 
 [verifier]
 timeout_sec = 120.0

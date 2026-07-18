@@ -25,7 +25,8 @@ pytestmark = [
     ),
 ]
 
-FIXTURE_TASK = Path(__file__).parent / "fixtures" / "hello-task"
+# Shared fixture (also backs the eval runners' job bootstrap); see its README.
+FIXTURE_TASK = Path(__file__).parent / "fixtures" / "hello-world"
 JOB_NAME = "harbor-mcp-e2e"
 RUN_TIMEOUT_SEC = 1200  # first run docker-builds the fixture image
 

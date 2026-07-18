@@ -1,11 +1,11 @@
 # harbor-mcp agentic evals
 
-Three [Harbor](https://github.com/harbor-framework/harbor) tasks that test a
-real agent (claude-code) using this repo's MCP server (`harbor-mcp`) inside a
-task container. Each task declares the server in `task.toml` via
-`[[environment.mcp_servers]]` with `transport = "stdio"`, so the server runs in
-the main container and the evals work on both the docker and modal
-environments (no docker-only compose sidecar).
+Agentic [Harbor](https://github.com/harbor-framework/harbor) tasks that gate on
+whether the **harbor-mcp capability surface works against the hub** for a real
+agent (claude-code). Each task declares this repo's MCP server (`harbor-mcp`) in
+`task.toml` via `[[environment.mcp_servers]]` with `transport = "stdio"`, so the
+server runs in the main container and the evals work on both the docker and
+modal environments (no docker-only compose sidecar).
 
 Each task's `environment/Dockerfile` installs `harbor-mcp` from GitHub so the
 stdio command resolves on PATH. Secrets are never baked into images:
@@ -14,84 +14,90 @@ at runtime with `harbor run --ae`.
 
 ## The evals
 
-| Eval | What the agent must do | Answer written to `/app/answer.txt` |
-| --- | --- | --- |
-| `verify-upload` | Confirm the job `$EVAL_JOB_ID` is uploaded to the hub and report its trial count | `yes <trial_count>` or `no` |
-| `fetch-job-results` | Report the mean reward of job `$EVAL_JOB_ID` | a plain decimal number, e.g. `0.75` |
-| `check-published-task` | Determine whether the package `$EVAL_TASK_REF` (`org/name@ref`) exists on the hub | `yes <64-hex content hash>` or `no` |
+The set is deliberately minimal -- one eval per capability bucket, covering
+reads and writes against the hub. Every task directory in `evals/` is an eval:
+the runners execute them all with a single `harbor run -p evals/`, in parallel,
+so nothing else may live here as a task directory.
 
-## Verification
+| Eval | Bucket | The agent must (via the MCP) | Answer in `/app/answer.txt` |
+| --- | --- | --- | --- |
+| `read-job` | job reads | report the mean reward of job `$EVAL_READ_JOB_ID` | a plain decimal, e.g. `1.0` |
+| `delete-job` | job writes | delete job `$EVAL_DELETE_JOB_ID` (writes enabled; confirm-gated) | `deleted` |
+| `check-published-task` | registry reads | decide whether `$EVAL_TASK_REF` is published | `yes` or `no` |
 
-Each `tests/test.sh` writes `1` or `0` to `/logs/verifier/reward.txt`. Because
-the verifier has no hub credentials, it cannot recompute ground truth on its
-own; it strictly validates the answer format and, when the host exports
-expected-value variables, checks the answer exactly:
+`read-job` and `delete-job` take separate seeded jobs so the parallel run has
+no read/delete race. `delete-job` enables the MCP write tools for itself via
+its own `[environment.env]`, so the read-only evals keep a read-only server.
 
-| Eval | Optional ground-truth env vars (exported on the host) |
+Auth (`whoami`) is exercised implicitly -- nothing reads or writes without it.
+Deliberately **out of scope** for a per-PR gate: `publish_task` /
+`publish_dataset` (published versions are immutable/content-addressed, not
+cleanly reversible) and `set_job_visibility` / `share_job` (niche).
+
+## Self-truthing verifiers
+
+Verifiers do not rely on planted expected values. `HARBOR_API_KEY` is threaded
+into each verifier through `[verifier.env]` (`${HARBOR_API_KEY:-}`, resolved
+from the host at `harbor run` time), so every `tests/test.sh` recomputes the
+ground truth live from the hub with the `harbor` CLI and compares:
+
+| Eval | How the verifier self-truths |
 | --- | --- |
-| `verify-upload` | `EVAL_EXPECTED_TRIAL_COUNT` |
-| `fetch-job-results` | `EVAL_EXPECTED_MEAN_REWARD` |
-| `check-published-task` | `EVAL_EXPECTED_PUBLISHED` (`yes`/`no`), `EVAL_EXPECTED_CONTENT_HASH` |
+| `read-job` | `harbor hub job show $EVAL_READ_JOB_ID --json` -> `.stats.avg_reward`, matched within 1e-6 |
+| `delete-job` | `harbor hub job show $EVAL_DELETE_JOB_ID --json` must be empty (job gone) |
+| `check-published-task` | `harbor download $EVAL_TASK_REF` succeeds iff published |
 
-These are resolved into the verifier through `[verifier.env]` templates
-(`${VAR:-}`) in each `task.toml`, so exporting them in the shell that runs
-`harbor run` is enough. Pass the same values with `--ae` when running the
-oracle so `solution/solve.sh` produces the matching exact answer.
-
-## Prerequisites
-
-- `harbor` CLI installed on the host (`uv tool install harbor`).
-- `HARBOR_API_KEY`: a Harbor hub API key (`harbor auth login`).
-- Claude credentials for the claude-code agent (`ANTHROPIC_API_KEY` or
-  `CLAUDE_CODE_OAUTH_TOKEN` in the host environment).
-- `EVAL_JOB_ID`: id of a job that is already uploaded to the hub.
-- `EVAL_TASK_REF`: a task package reference (`org/name@ref`), e.g.
-  `harbor/hello-world@1.0.0`.
-- `HARBOR_TEST_ENV`: `docker` (default; needs a local Docker daemon) or
-  `modal` (needs Modal credentials).
-
-Note: the CI repo secrets backing these variables are still pending, so CI
-does not run the evals yet.
+Oracles (`solution/solve.sh`) answer the same questions independently, also via
+the `harbor` CLI.
 
 ## Running
 
-All three, via the Make target (backed by `scripts/run_evals.sh`):
-
 ```bash
 export HARBOR_API_KEY=hk_...
-export EVAL_JOB_ID=<uploaded job id>
-export EVAL_TASK_REF=org/name@ref
-make evals
+make evals          # the merge gate: drives the evals with claude-code
 ```
 
-Individually:
+`make evals` (backed by `evals/run_evals.sh`) is self-contained, in three
+phases:
+
+1. **Seed** -- mints two fresh hub jobs with the oracle agent (no LLM cost) by
+   running the `tests/e2e/fixtures/hello-world` fixture with `--upload`: one
+   job for `read-job` (`EVAL_READ_JOB_ID`) and one for `delete-job`
+   (`EVAL_DELETE_JOB_ID`). Fresh ids per run mean no cross-run collisions; two
+   jobs mean the parallel evals cannot race each other.
+2. **Run** -- a single `harbor run -p evals/ -a claude-code` executes all the
+   evals in parallel, then the runner gates on every reward being `1.0`
+   (`evals/check_reward.py`) -- `harbor run` exits 0 regardless of reward, so
+   the runner inspects the result itself. `check-published-task` checks the
+   pinned public task `hello-world/hello-world@1`.
+3. **Cleanup** -- drops any seeded job that still exists on the hub
+   (`delete-job` removes its own on success; the read job always needs
+   dropping).
+
+`HARBOR_TEST_ENV` selects `docker` (default; needs a local Docker daemon) or
+`modal` (needs Modal credentials); CI's gate uses modal.
+
+## Eval-safety check
 
 ```bash
-harbor run -p evals/verify-upload -a claude-code -e "$HARBOR_TEST_ENV" \
-  --ae HARBOR_API_KEY="$HARBOR_API_KEY" \
-  --ae EVAL_JOB_ID="$EVAL_JOB_ID"
-
-harbor run -p evals/fetch-job-results -a claude-code -e "$HARBOR_TEST_ENV" \
-  --ae HARBOR_API_KEY="$HARBOR_API_KEY" \
-  --ae EVAL_JOB_ID="$EVAL_JOB_ID"
-
-harbor run -p evals/check-published-task -a claude-code -e "$HARBOR_TEST_ENV" \
-  --ae HARBOR_API_KEY="$HARBOR_API_KEY" \
-  --ae EVAL_TASK_REF="$EVAL_TASK_REF"
+make eval-safety    # oracle must pass, nop must fail -- no LLM cost
 ```
 
-The evals only need read tools, so `HARBOR_MCP_ENABLE_WRITES` is not passed.
+`evals/run_eval_safety.sh` mirrors the gate runner's seed/run/cleanup shape
+twice: once with the `oracle` agent (every eval must reach reward 1.0 -- the
+evals are solvable) and once with the `nop` agent, which produces no answer
+(every eval must score 0 -- the evals are not trivially passable). Each agent
+gets its own seeded job pair; all seeds are dropped afterward. This runs in CI
+via [`eval-safety.yml`](../.github/workflows/eval-safety.yml) on every PR that
+touches `evals/**`, so the evals stay honest independently of the merge gate.
 
-## Follow-up: oracle validation
+## Two-phase rollout
 
-Once the env vars / repo secrets exist, validate each task end to end with the
-oracle agent (runs `solution/solve.sh` instead of a model):
+1. This PR adds the evals and the eval-safety check (not yet a merge gate).
+2. A follow-up adds the `evals` job to [`ci.yml`](../.github/workflows/ci.yml):
+   it runs `make evals` with claude-code on modal for every PR to `main` and is
+   marked a required status check, gating merges on the MCP capabilities.
 
-```bash
-harbor run -p evals/verify-upload -a oracle -e "$HARBOR_TEST_ENV" \
-  --ae EVAL_EXPECTED_TRIAL_COUNT="$EVAL_EXPECTED_TRIAL_COUNT"
-```
-
-and similarly for the other two tasks with their expected-value variables.
-This is tracked as a follow-up; nothing in this directory has been executed
-yet.
+Note: the eval images install `harbor-mcp` from the GitHub default branch, so
+today the gate exercises the published server, not an open PR's server changes.
+Building the image from the PR checkout is a tracked follow-up.
