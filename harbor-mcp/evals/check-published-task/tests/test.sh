@@ -1,15 +1,11 @@
 #!/bin/bash
-# Verifier for the check-published-task eval.
+# Self-truthing verifier for the check-published-task eval.
 #
-# The agent must write exactly one line to /app/answer.txt:
-#   "yes <content_hash>"  (package exists; <content_hash> is 64 lowercase hex chars), or
-#   "no"                  (package does not exist)
-#
-# Limitation: without hub access the verifier cannot recompute ground truth,
-# so by default it validates the answer format strictly. When the host exports
-# EVAL_EXPECTED_PUBLISHED (yes|no) and, for the "yes" case,
-# EVAL_EXPECTED_CONTENT_HASH (resolved through [verifier.env] in task.toml),
-# the answer must additionally match them exactly.
+# The agent must write "yes" or "no" to /app/answer.txt for whether
+# $EVAL_TASK_REF is published. With HARBOR_API_KEY threaded in via
+# [verifier.env], the verifier probes the hub with the harbor CLI (a download of
+# the ref succeeds iff it is published) and requires the answer to match. A
+# no-op agent writes nothing and fails.
 set -u
 
 ANSWER_FILE=/app/answer.txt
@@ -30,38 +26,21 @@ pass() {
     exit 0
 }
 
-if [ ! -f "$ANSWER_FILE" ]; then
-    fail "answer file $ANSWER_FILE does not exist"
-fi
+[ -n "${HARBOR_API_KEY:-}" ] \
+    || fail "verifier has no HARBOR_API_KEY (thread it via [verifier.env])"
+[ -n "${EVAL_TASK_REF:-}" ] || fail "EVAL_TASK_REF is not set for the verifier"
+[ -f "$ANSWER_FILE" ] || fail "answer file $ANSWER_FILE does not exist"
 
-# Trim trailing whitespace/newlines; the answer must be a single non-empty line.
 answer="$(tr -d '\r' < "$ANSWER_FILE" | sed -e 's/[[:space:]]*$//' -e '/^$/d')"
+printf '%s' "$answer" | grep -Eq '^(yes|no)$' \
+    || fail "answer must be exactly 'yes' or 'no', got: '$answer'"
 
-if [ -z "$answer" ]; then
-    fail "answer file $ANSWER_FILE is empty"
+if harbor download "$EVAL_TASK_REF" -o "$(mktemp -d)" > /dev/null 2>&1; then
+    truth=yes
+else
+    truth=no
 fi
+[ "$answer" = "$truth" ] \
+    || fail "answer '$answer' does not match published truth '$truth' for $EVAL_TASK_REF"
 
-if [ "$(printf '%s\n' "$answer" | wc -l | tr -d ' ')" -ne 1 ]; then
-    fail "answer file $ANSWER_FILE must contain exactly one non-empty line, got: '$answer'"
-fi
-
-if ! printf '%s' "$answer" | grep -Eq '^(yes [0-9a-f]{64}|no)$'; then
-    fail "answer '$answer' does not match the required format 'yes <64-hex content hash>' or 'no'"
-fi
-
-if [ -n "${EVAL_EXPECTED_PUBLISHED:-}" ]; then
-    if [ "$EVAL_EXPECTED_PUBLISHED" = "yes" ]; then
-        if [ -z "${EVAL_EXPECTED_CONTENT_HASH:-}" ]; then
-            fail "EVAL_EXPECTED_PUBLISHED=yes requires EVAL_EXPECTED_CONTENT_HASH to be set"
-        fi
-        expected="yes ${EVAL_EXPECTED_CONTENT_HASH}"
-    else
-        expected="no"
-    fi
-    if [ "$answer" != "$expected" ]; then
-        fail "answer '$answer' does not match expected '$expected' (ref ${EVAL_TASK_REF:-unknown})"
-    fi
-    pass "answer '$answer' matches expected '$expected'"
-fi
-
-pass "answer '$answer' has a valid format (no ground truth provided; format-only check)"
+pass "answer '$answer' matches published truth '$truth' for $EVAL_TASK_REF"

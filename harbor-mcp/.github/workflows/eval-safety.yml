@@ -1,0 +1,32 @@
+name: eval-safety
+
+# Runs only when the evals change: prove each eval is solvable by its oracle and
+# not trivially passable by a no-op agent. No LLM/Anthropic cost. This is NOT the
+# merge gate on the MCP capabilities (that is the `evals` job in ci.yml) -- it is
+# the safety net that keeps the evals themselves honest.
+on:
+  pull_request:
+    paths:
+      - "evals/**"
+
+jobs:
+  eval-safety:
+    runs-on: ubuntu-latest
+    env:
+      HARBOR_API_KEY: ${{ secrets.HARBOR_API_KEY }}
+      HARBOR_TEST_ENV: docker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --dev
+      # run_eval_safety.sh calls the bare `harbor` console script from the venv.
+      - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Run eval-safety (oracle + nop)
+        run: |
+          if [ -z "${HARBOR_API_KEY:-}" ]; then
+            echo "HARBOR_API_KEY absent (fork PR?); skipping eval-safety."
+            exit 0
+          fi
+          make eval-safety

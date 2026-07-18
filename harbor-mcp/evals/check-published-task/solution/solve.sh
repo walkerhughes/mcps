@@ -1,17 +1,17 @@
 #!/bin/bash
 # Reference solution (oracle) for the check-published-task eval.
 #
-# The eval's real subject is the agent-plus-MCP path; this script only needs to
-# produce a correctly shaped answer deterministically. When the runner provides
-# ground truth via EVAL_EXPECTED_PUBLISHED / EVAL_EXPECTED_CONTENT_HASH (passed
-# with `harbor run --ae`), the answer is exact and also satisfies the
-# verifier's expected-value check.
+# The eval's real subject is the agent-plus-MCP path; the oracle answers the
+# same question independently via the harbor CLI (a download of the ref
+# succeeds iff it is published), so a passing oracle proves the eval is solvable
+# against the live hub. HARBOR_API_KEY and EVAL_TASK_REF reach this script
+# through the agent env (`harbor run --ae`).
 set -euo pipefail
 
 mkdir -p /app
 
-if [ "${EVAL_EXPECTED_PUBLISHED:-no}" = "yes" ] && [ -n "${EVAL_EXPECTED_CONTENT_HASH:-}" ]; then
-    printf 'yes %s\n' "$EVAL_EXPECTED_CONTENT_HASH" > /app/answer.txt
+if harbor download "$EVAL_TASK_REF" -o "$(mktemp -d)" > /dev/null 2>&1; then
+    echo yes > /app/answer.txt
 else
-    printf 'no\n' > /app/answer.txt
+    echo no > /app/answer.txt
 fi

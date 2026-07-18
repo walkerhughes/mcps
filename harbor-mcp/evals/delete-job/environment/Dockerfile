@@ -1,4 +1,4 @@
-# Agent container for the fetch-job-results eval.
+# Agent container for the check-published-task eval.
 #
 # python:3.12-slim satisfies harbor-mcp's Python >= 3.12 requirement and pip
 # installs into the image without an externally-managed-environment block.

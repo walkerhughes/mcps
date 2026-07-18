@@ -5,19 +5,16 @@ Harbor hub, including `whoami`, `check_task_published`, and `resolve_dataset`.
 
 The task reference to check is provided in the `EVAL_TASK_REF` environment
 variable (read it with `echo $EVAL_TASK_REF`). It has the form
-`org/name@ref`, for example `harbor/hello-world@1.0.0`.
+`org/name@ref`, for example `hello-world/hello-world@1`.
 
 Your task:
 
-1. Use the `harbor-hub` MCP tools (not the raw hub API) to determine whether
-   the task package `$EVAL_TASK_REF` exists on the Harbor hub.
-2. If it exists, find its content hash (a 64-character lowercase hexadecimal
-   SHA-256 digest).
-3. Write your answer to `/app/answer.txt`:
-   - If the package exists, write exactly one line: `yes <content_hash>`
-     where `<content_hash>` is the 64-character lowercase hex hash,
-     for example `yes 3f2c...a1b0` (with the full 64 characters).
-   - If the package does not exist, write exactly one line: `no`.
+1. Use the `harbor-hub` MCP tools (not the raw hub API and not the `harbor`
+   CLI) to determine whether the task package `$EVAL_TASK_REF` exists on the
+   Harbor hub.
+2. Write your answer to `/app/answer.txt` as exactly one line:
+   - `yes` if the package is published, or
+   - `no` if it is not.
 
-The file must contain only that single line and nothing else: no extra text,
+The file must contain only that single word and nothing else: no extra text,
 no punctuation, no code fences.

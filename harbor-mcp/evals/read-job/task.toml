@@ -1,8 +1,8 @@
 schema_version = "1.1"
 
 [task]
-name = "harbor-mcp/verify-upload"
-description = "Use the harbor-hub MCP server to confirm a job is uploaded and report its trial count."
+name = "harbor-mcp/read-job"
+description = "Use the harbor-hub MCP server to read a hub job and report its mean reward."
 authors = []
 keywords = ["mcp", "harbor-hub", "eval"]
 
@@ -17,11 +17,11 @@ timeout_sec = 600.0
 timeout_sec = 120.0
 
 # Resolved from the HOST environment when the verifier runs (empty when unset).
-# EVAL_EXPECTED_TRIAL_COUNT optionally provides ground truth for an exact check;
-# without it the verifier can only validate the answer format (see tests/test.sh).
+# The verifier is self-truthing: with HARBOR_API_KEY it recomputes the job's
+# mean reward from the hub via the harbor CLI and compares (see tests/test.sh).
 [verifier.env]
+HARBOR_API_KEY = "${HARBOR_API_KEY:-}"
 EVAL_JOB_ID = "${EVAL_JOB_ID:-}"
-EVAL_EXPECTED_TRIAL_COUNT = "${EVAL_EXPECTED_TRIAL_COUNT:-}"
 
 [environment]
 build_timeout_sec = 900.0

@@ -1,4 +1,4 @@
-# Fetch a job's results from the Harbor hub
+# Report a job's mean reward from the Harbor hub
 
 An MCP server named `harbor-hub` is available to you. It exposes tools for the
 Harbor hub, including `whoami`, `get_job_overview`, `get_job_trials`, and
@@ -9,10 +9,10 @@ The job id to inspect is provided in the `EVAL_JOB_ID` environment variable
 
 Your task:
 
-1. Use the `harbor-hub` MCP tools (not the raw hub API) to look up the job
-   with id `$EVAL_JOB_ID` on the Harbor hub.
-2. Determine the job's mean reward across its trials. Prefer the mean reward
-   reported by the job overview; only compute it yourself from per-trial
+1. Use the `harbor-hub` MCP tools (not the raw hub API and not the `harbor`
+   CLI) to look up the job with id `$EVAL_JOB_ID` on the Harbor hub.
+2. Determine the job's mean reward across its trials. Prefer the aggregate mean
+   reward reported by the job overview; only compute it yourself from per-trial
    rewards if no aggregate is reported.
 3. Write the mean reward to `/app/answer.txt` as exactly one line containing a
    plain decimal number, for example `0.75` or `1.0` or `0`.

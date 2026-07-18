@@ -2,7 +2,7 @@ schema_version = "1.1"
 
 [task]
 name = "harbor-mcp/check-published-task"
-description = "Use the harbor-hub MCP server to check whether a task package exists on the hub and report its content hash."
+description = "Use the harbor-hub MCP server to check whether a task package is published on the hub."
 authors = []
 keywords = ["mcp", "harbor-hub", "eval"]
 
@@ -17,13 +17,11 @@ timeout_sec = 600.0
 timeout_sec = 120.0
 
 # Resolved from the HOST environment when the verifier runs (empty when unset).
-# EVAL_EXPECTED_PUBLISHED (yes|no) and EVAL_EXPECTED_CONTENT_HASH optionally
-# provide ground truth for an exact check; without them the verifier can only
-# validate the answer format (see tests/test.sh).
+# The verifier is self-truthing: with HARBOR_API_KEY it probes the hub via the
+# harbor CLI to decide the published truth for EVAL_TASK_REF (see tests/test.sh).
 [verifier.env]
+HARBOR_API_KEY = "${HARBOR_API_KEY:-}"
 EVAL_TASK_REF = "${EVAL_TASK_REF:-}"
-EVAL_EXPECTED_PUBLISHED = "${EVAL_EXPECTED_PUBLISHED:-}"
-EVAL_EXPECTED_CONTENT_HASH = "${EVAL_EXPECTED_CONTENT_HASH:-}"
 
 [environment]
 build_timeout_sec = 900.0

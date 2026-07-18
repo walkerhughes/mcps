@@ -1,0 +1,44 @@
+schema_version = "1.1"
+
+[task]
+name = "harbor-mcp/delete-job"
+description = "Use the harbor-hub MCP server (writes enabled) to delete a hub job."
+authors = []
+keywords = ["mcp", "harbor-hub", "eval", "write"]
+
+[metadata]
+category = "mcp"
+difficulty = "easy"
+
+[agent]
+timeout_sec = 600.0
+
+[verifier]
+timeout_sec = 120.0
+
+# Resolved from the HOST environment when the verifier runs (empty when unset).
+# The verifier is self-truthing: with HARBOR_API_KEY it confirms via the harbor
+# CLI that the job is actually gone from the hub (see tests/test.sh).
+[verifier.env]
+HARBOR_API_KEY = "${HARBOR_API_KEY:-}"
+EVAL_JOB_ID = "${EVAL_JOB_ID:-}"
+
+[environment]
+build_timeout_sec = 900.0
+cpus = 1
+memory_mb = 2048
+storage_mb = 10240
+gpus = 0
+
+# stdio transport: the server runs inside the main container, so this works on
+# both docker and modal. The `harbor-mcp` command resolves because
+# environment/Dockerfile installs this repo. This is a WRITE eval, so the runner
+# passes `--ae HARBOR_MCP_ENABLE_WRITES=true` (alongside HARBOR_API_KEY) to
+# unlock the delete_job tool inside the agent's MCP server.
+[[environment.mcp_servers]]
+name = "harbor-hub"
+transport = "stdio"
+command = "harbor-mcp"
+args = []
+
+[solution.env]
