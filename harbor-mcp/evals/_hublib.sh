@@ -12,10 +12,13 @@ BOOTSTRAP_TASK="${BOOTSTRAP_TASK:-$REPO_ROOT/tests/e2e/fixtures/hello-world}"
 # bootstrap_job <out_dir> [job_name]
 # Runs BOOTSTRAP_TASK with the oracle agent (no LLM cost) and uploads it,
 # creating a fresh hub job. Job artifacts land under <out_dir>. Echoes the new
-# hub job id on stdout; all harbor chatter goes to stderr.
+# hub job id on stdout. Harbor's progress tables are seeding noise, so they go
+# to <out_dir>/bootstrap.log and are only dumped (to stderr) on failure --
+# keeping the runners' output to one result table per eval run.
 bootstrap_job() {
     local out=$1 name=${2:-harbor-mcp-evals}
-    harbor run \
+    mkdir -p "$out"
+    if ! harbor run \
         -y \
         -p "$BOOTSTRAP_TASK" \
         -a oracle \
@@ -23,7 +26,10 @@ bootstrap_job() {
         -o "$out" \
         --job-name "$name" \
         --upload \
-        -q >&2
+        -q > "$out/bootstrap.log" 2>&1; then
+        cat "$out/bootstrap.log" >&2
+        return 1
+    fi
     python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["id"])' \
         "$out/$name/result.json"
 }
