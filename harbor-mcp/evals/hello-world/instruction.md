@@ -1,3 +1,3 @@
 Create a file at /app/hello.txt containing exactly the line:
 
-Hello, harbor-mcp!
+Hello, world!

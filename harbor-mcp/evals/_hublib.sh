@@ -3,11 +3,11 @@
 # Requires in the environment: HARBOR_API_KEY, HARBOR_TEST_ENV (docker|modal),
 # and REPO_ROOT (repo root path). `harbor` must be on PATH.
 
-# The task the bootstrap runs to mint a hub job: Harbor's own maintained
-# hello-world (the member task of the public harbor/hello-world dataset), run
-# straight from the registry so we neither vendor a copy nor reach into tests/.
-# Pinned to an immutable revision. check-published-task points at the same task.
-BOOTSTRAP_TASK="${BOOTSTRAP_TASK:-hello-world/hello-world@1}"
+# The task the bootstrap runs to mint a hub job: evals/hello-world, a trivial
+# deterministic task that lives in this repo (not tests/) and runs on modal.
+# It is a modal-compatible equivalent of Harbor's ubuntu-based hello-world,
+# which cannot bootstrap on modal (its image builder needs a python base).
+BOOTSTRAP_TASK="${BOOTSTRAP_TASK:-$REPO_ROOT/evals/hello-world}"
 
 # bootstrap_job <out_dir>
 # Runs BOOTSTRAP_TASK with the oracle agent (no LLM cost) and uploads it,
@@ -17,7 +17,7 @@ bootstrap_job() {
     local out=$1
     harbor run \
         -y \
-        -t "$BOOTSTRAP_TASK" \
+        -p "$BOOTSTRAP_TASK" \
         -a oracle \
         -e "$HARBOR_TEST_ENV" \
         -o "$out" \

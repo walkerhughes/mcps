@@ -53,12 +53,12 @@ make evals          # the merge gate: drives the evals with claude-code
 
 `make evals` (backed by `evals/run_evals.sh`) is self-contained:
 
-1. **Bootstraps a hub job** for the job-based evals -- runs Harbor's own
-   maintained `hello-world/hello-world@1` task (the member of the public
-   `harbor/hello-world` dataset) straight from the registry with the
-   deterministic oracle agent, uploads it, and uses that fresh job id as
-   `EVAL_JOB_ID`. A fresh id per run means no cross-run collisions; running the
-   registry task means no fixture is vendored or borrowed from `tests/`.
+1. **Bootstraps a hub job** for the job-based evals -- runs `evals/hello-world`
+   (a trivial deterministic task, the modal-compatible equivalent of Harbor's
+   ubuntu-based hello-world) with the oracle agent, uploads it, and uses that
+   fresh job id as `EVAL_JOB_ID`. A fresh id per run means no cross-run
+   collisions. This task lives in `evals/` and also backs the e2e roundtrip
+   test, so nothing here depends on a fixture under `tests/`.
 2. **Runs the three evals** with claude-code and gates each on reward `1.0`
    (`evals/check_reward.py`) -- `harbor run` exits 0 regardless of reward, so
    the runner inspects the result itself. `read-job` reads the job; `delete-job`
