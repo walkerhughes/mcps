@@ -29,6 +29,10 @@ cpus = 1
 memory_mb = 2048
 storage_mb = 10240
 gpus = 0
+# The agent's MCP server, the oracle, and the verifier all reach the Harbor hub
+# over the network. Modal blocks egress unless the policy is public (docker
+# allows it by default), so this is required for the modal env.
+network_mode = "public"
 
 # stdio transport: the server runs inside the main container, so this works on
 # both docker and modal (unlike the compose-sidecar pattern, which is

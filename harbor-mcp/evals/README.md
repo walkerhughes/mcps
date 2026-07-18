@@ -53,10 +53,12 @@ make evals          # the merge gate: drives the evals with claude-code
 
 `make evals` (backed by `evals/run_evals.sh`) is self-contained:
 
-1. **Bootstraps a hub job** for the job-based evals -- runs the
-   `tests/e2e/fixtures/hello-task` fixture with the deterministic oracle agent,
-   uploads it, and uses that fresh job id as `EVAL_JOB_ID`. A fresh id per run
-   means no cross-run collisions.
+1. **Bootstraps a hub job** for the job-based evals -- runs Harbor's own
+   maintained `hello-world/hello-world@1` task (the member of the public
+   `harbor/hello-world` dataset) straight from the registry with the
+   deterministic oracle agent, uploads it, and uses that fresh job id as
+   `EVAL_JOB_ID`. A fresh id per run means no cross-run collisions; running the
+   registry task means no fixture is vendored or borrowed from `tests/`.
 2. **Runs the three evals** with claude-code and gates each on reward `1.0`
    (`evals/check_reward.py`) -- `harbor run` exits 0 regardless of reward, so
    the runner inspects the result itself. `read-job` reads the job; `delete-job`
@@ -92,8 +94,3 @@ gate.
 Note: the eval images install `harbor-mcp` from the GitHub default branch, so
 today the gate exercises the published server, not an open PR's server changes.
 Building the image from the PR checkout is a tracked follow-up.
-
-## Other examples
-
-`hello-mcp/` is a standalone demo (not part of the gate) of a multi-container
-task that declares its own MCP server; see its README.

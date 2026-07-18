@@ -3,16 +3,21 @@
 # Requires in the environment: HARBOR_API_KEY, HARBOR_TEST_ENV (docker|modal),
 # and REPO_ROOT (repo root path). `harbor` must be on PATH.
 
+# The task the bootstrap runs to mint a hub job: Harbor's own maintained
+# hello-world (the member task of the public harbor/hello-world dataset), run
+# straight from the registry so we neither vendor a copy nor reach into tests/.
+# Pinned to an immutable revision. check-published-task points at the same task.
+BOOTSTRAP_TASK="${BOOTSTRAP_TASK:-hello-world/hello-world@1}"
+
 # bootstrap_job <out_dir>
-# Runs the hello-task fixture with the oracle agent (no LLM cost) and uploads
-# it, creating a fresh hub job. Job artifacts land under <out_dir>. Echoes the
-# new hub job id on stdout; all harbor chatter goes to stderr.
+# Runs BOOTSTRAP_TASK with the oracle agent (no LLM cost) and uploads it,
+# creating a fresh hub job. Job artifacts land under <out_dir>. Echoes the new
+# hub job id on stdout; all harbor chatter goes to stderr.
 bootstrap_job() {
-    local out=$1 fixture
-    fixture="$REPO_ROOT/tests/e2e/fixtures/hello-task"
+    local out=$1
     harbor run \
         -y \
-        -p "$fixture" \
+        -t "$BOOTSTRAP_TASK" \
         -a oracle \
         -e "$HARBOR_TEST_ENV" \
         -o "$out" \
