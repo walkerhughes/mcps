@@ -63,7 +63,10 @@ run_eval() {
     local name=$1
     shift
     echo "==> Running eval: $name (claude-code, env: $HARBOR_TEST_ENV)"
+    # -y auto-confirms harbor's prompt for [verifier.env] host vars (it would
+    # abort in non-interactive CI otherwise).
     harbor run \
+        -y \
         -p "$REPO_ROOT/evals/$name" \
         -a claude-code \
         -e "$HARBOR_TEST_ENV" \

@@ -11,6 +11,7 @@ bootstrap_job() {
     local out=$1 fixture
     fixture="$REPO_ROOT/tests/e2e/fixtures/hello-task"
     harbor run \
+        -y \
         -p "$fixture" \
         -a oracle \
         -e "$HARBOR_TEST_ENV" \

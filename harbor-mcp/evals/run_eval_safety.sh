@@ -49,7 +49,10 @@ perfect_for() {
         ae=(--ae EVAL_JOB_ID="$job")
         export EVAL_JOB_ID="$job"
     fi
+    # -y auto-confirms harbor's prompt for [verifier.env] host vars (it would
+    # abort in non-interactive CI otherwise).
     harbor run \
+        -y \
         -p "$REPO_ROOT/evals/$name" \
         -a "$agent" \
         -e "$HARBOR_TEST_ENV" \
