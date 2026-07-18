@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Eval-safety check (backs `make eval-safety`): for every eval, the oracle must
-# reach reward 1.0 and the nop agent (which produces no answer) must NOT. This
-# proves each eval is solvable and not trivially passable -- run it whenever the
-# evals change. No LLM/Anthropic cost (oracle runs solve.sh; nop does nothing).
+# Eval-safety check (backs `make eval-safety`): the oracle must reach reward
+# 1.0 on every eval and the nop agent (which produces no answer) must reach
+# reward 0 on every eval. This proves each eval is solvable and not trivially
+# passable -- run it whenever the evals change. No LLM/Anthropic cost.
 #
-# Each job-based eval gets its own freshly bootstrapped hub job per agent run,
-# dropped afterward, so oracle's delete does not disturb nop's run.
+# Mirrors the gate runner's shape: each agent gets its own pair of freshly
+# seeded hub jobs (one to read, one to delete -- no parallel read/delete race),
+# then a single `harbor run -p evals/` executes every eval in parallel. All
+# seeded jobs are dropped afterwards (the oracle's delete-job removes its own).
 #
 # Required host environment:
 #   HARBOR_API_KEY   Harbor hub API key
@@ -22,7 +24,15 @@ JOBS_DIR="$(mktemp -d)"
 # shellcheck source=evals/_hublib.sh
 . "$REPO_ROOT/evals/_hublib.sh"
 
-trap 'rm -rf "$JOBS_DIR"' EXIT
+SEEDED_JOBS=()
+cleanup() {
+    rm -rf "$JOBS_DIR"
+    local job
+    for job in "${SEEDED_JOBS[@]:-}"; do
+        drop_job "$job"
+    done
+}
+trap cleanup EXIT
 
 die() {
     echo "error: $1" >&2
@@ -34,57 +44,53 @@ command -v harbor > /dev/null 2>&1 \
 [ -n "${HARBOR_API_KEY:-}" ] \
     || die "HARBOR_API_KEY is not set (mint one with: harbor auth login)"
 
-# Exported so harbor resolves them into each task's [verifier.env] templates.
 export HARBOR_API_KEY EVAL_TASK_REF
 
-# perfect_for <agent> <job|none> <eval> [extra --ae...]
-# Runs one eval with one agent, managing a fresh bootstrapped job when needed.
-# Echoes "yes" if the run reached reward 1.0, else "no".
-perfect_for() {
-    local agent=$1 needs=$2 name=$3
-    shift 3
-    local out="$JOBS_DIR/$agent-$name" job="" ae=()
-    if [ "$needs" = job ]; then
-        job="$(bootstrap_job "$out/boot")" || { echo no; return; }
-        ae=(--ae EVAL_JOB_ID="$job")
-        export EVAL_JOB_ID="$job"
-    fi
+# run_all <agent>
+# Seeds a fresh job pair, then runs every eval in evals/ in parallel with
+# <agent>. Leaves the run's result.json at $JOBS_DIR/<agent>/safety-<agent>/.
+run_all() {
+    local agent=$1
+    echo "==> Seeding hub jobs for $agent (env: $HARBOR_TEST_ENV)"
+    local read_job delete_job
+    read_job="$(bootstrap_job "$JOBS_DIR/$agent-seed-read" "safety-$agent-read")"
+    delete_job="$(bootstrap_job "$JOBS_DIR/$agent-seed-delete" "safety-$agent-delete")"
+    SEEDED_JOBS+=("$read_job" "$delete_job")
+    export EVAL_READ_JOB_ID="$read_job"
+    export EVAL_DELETE_JOB_ID="$delete_job"
+
+    echo "==> Running all evals with $agent (env: $HARBOR_TEST_ENV)"
     # -y auto-confirms harbor's prompt for [verifier.env] host vars (it would
     # abort in non-interactive CI otherwise).
     harbor run \
         -y \
-        -p "$REPO_ROOT/evals/$name" \
+        -p "$REPO_ROOT/evals" \
         -a "$agent" \
         -e "$HARBOR_TEST_ENV" \
-        -o "$out" \
-        --job-name "$name" \
+        -o "$JOBS_DIR/$agent" \
+        --job-name "safety-$agent" \
         --ae HARBOR_API_KEY="$HARBOR_API_KEY" \
-        "${ae[@]}" "$@" > /dev/null 2>&1 || true
-    if python3 "$REPO_ROOT/evals/check_reward.py" "$out/$name/result.json" "$name" \
-        > /dev/null 2>&1; then
-        echo yes
-    else
-        echo no
-    fi
-    drop_job "$job"
+        --ae EVAL_READ_JOB_ID="$read_job" \
+        --ae EVAL_DELETE_JOB_ID="$delete_job" \
+        --ae EVAL_TASK_REF="$EVAL_TASK_REF"
 }
 
-assert_eval() {
-    local needs=$1 name=$2
-    shift 2
-    echo "==> $name: oracle must pass, nop must fail"
-    if [ "$(perfect_for oracle "$needs" "$name" "$@")" != yes ]; then
-        echo "--- $name oracle verifier output ---" >&2
-        cat "$JOBS_DIR/oracle-$name/$name"/*/verifier/test-stdout.txt >&2 2>/dev/null || true
-        die "$name: the ORACLE did not reach reward 1.0 (the eval is broken)"
-    fi
-    [ "$(perfect_for nop "$needs" "$name" "$@")" = no ] \
-        || die "$name: the NOP agent reached reward 1.0 (the eval is trivially passable)"
-    echo "==> $name: OK (oracle passed, nop failed)"
+show_verifier_output() {
+    local agent=$1
+    echo "--- $agent verifier output ---" >&2
+    cat "$JOBS_DIR/$agent/safety-$agent"/*/verifier/test-stdout.txt >&2 2>/dev/null || true
 }
 
-assert_eval job read-job
-assert_eval job delete-job --ae HARBOR_MCP_ENABLE_WRITES=true
-assert_eval none check-published-task --ae EVAL_TASK_REF="$EVAL_TASK_REF"
+# The oracle must solve every eval: the evals are solvable.
+run_all oracle
+python3 "$REPO_ROOT/evals/check_reward.py" \
+    "$JOBS_DIR/oracle/safety-oracle/result.json" safety-oracle \
+    || { show_verifier_output oracle; die "the ORACLE did not reach reward 1.0 on every eval (an eval is broken)"; }
 
-echo "==> Eval-safety passed for all evals."
+# The nop agent must fail every eval: the evals are not trivially passable.
+run_all nop
+python3 "$REPO_ROOT/evals/check_reward.py" \
+    "$JOBS_DIR/nop/safety-nop/result.json" safety-nop --expect-zero \
+    || { show_verifier_output nop; die "the NOP agent scored above 0 on an eval (an eval is trivially passable)"; }
+
+echo "==> Eval-safety passed: oracle solved every eval; nop failed every eval."

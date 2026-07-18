@@ -21,7 +21,7 @@ timeout_sec = 120.0
 # CLI that the job is actually gone from the hub (see tests/test.sh).
 [verifier.env]
 HARBOR_API_KEY = "${HARBOR_API_KEY:-}"
-EVAL_JOB_ID = "${EVAL_JOB_ID:-}"
+EVAL_DELETE_JOB_ID = "${EVAL_DELETE_JOB_ID:-}"
 
 [environment]
 build_timeout_sec = 900.0
@@ -34,11 +34,16 @@ gpus = 0
 # allows it by default), so this is required for the modal env.
 network_mode = "public"
 
+# This is the WRITE eval: enable the MCP write tools for THIS task only, so the
+# runner's single `harbor run -p evals/` needs no global writes flag and the
+# read-only evals keep a read-only server. The container env is inherited by
+# the stdio MCP server the agent spawns.
+[environment.env]
+HARBOR_MCP_ENABLE_WRITES = "true"
+
 # stdio transport: the server runs inside the main container, so this works on
 # both docker and modal. The `harbor-mcp` command resolves because
-# environment/Dockerfile installs this repo. This is a WRITE eval, so the runner
-# passes `--ae HARBOR_MCP_ENABLE_WRITES=true` (alongside HARBOR_API_KEY) to
-# unlock the delete_job tool inside the agent's MCP server.
+# environment/Dockerfile installs this repo.
 [[environment.mcp_servers]]
 name = "harbor-hub"
 transport = "stdio"

@@ -3,29 +3,29 @@
 # Requires in the environment: HARBOR_API_KEY, HARBOR_TEST_ENV (docker|modal),
 # and REPO_ROOT (repo root path). `harbor` must be on PATH.
 
-# The task the bootstrap runs to mint a hub job: evals/hello-world, a trivial
-# deterministic task that lives in this repo (not tests/) and runs on modal.
-# It is a modal-compatible equivalent of Harbor's ubuntu-based hello-world,
-# which cannot bootstrap on modal (its image builder needs a python base).
-BOOTSTRAP_TASK="${BOOTSTRAP_TASK:-$REPO_ROOT/evals/hello-world}"
+# The task the bootstrap runs to mint hub jobs: the shared hello-world fixture
+# (modal-compatible; see its README). It lives under tests/e2e/fixtures, NOT
+# evals/, because the gate runs `harbor run -p evals/` and this canary is a
+# seeding fixture, not an MCP eval.
+BOOTSTRAP_TASK="${BOOTSTRAP_TASK:-$REPO_ROOT/tests/e2e/fixtures/hello-world}"
 
-# bootstrap_job <out_dir>
+# bootstrap_job <out_dir> [job_name]
 # Runs BOOTSTRAP_TASK with the oracle agent (no LLM cost) and uploads it,
 # creating a fresh hub job. Job artifacts land under <out_dir>. Echoes the new
 # hub job id on stdout; all harbor chatter goes to stderr.
 bootstrap_job() {
-    local out=$1
+    local out=$1 name=${2:-harbor-mcp-evals}
     harbor run \
         -y \
         -p "$BOOTSTRAP_TASK" \
         -a oracle \
         -e "$HARBOR_TEST_ENV" \
         -o "$out" \
-        --job-name harbor-mcp-evals \
+        --job-name "$name" \
         --upload \
         -q >&2
     python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["id"])' \
-        "$out/harbor-mcp-evals/result.json"
+        "$out/$name/result.json"
 }
 
 # drop_job <job_id>

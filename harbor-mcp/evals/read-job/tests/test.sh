@@ -27,7 +27,7 @@ pass() {
 
 [ -n "${HARBOR_API_KEY:-}" ] \
     || fail "verifier has no HARBOR_API_KEY (thread it via [verifier.env])"
-[ -n "${EVAL_JOB_ID:-}" ] || fail "EVAL_JOB_ID is not set for the verifier"
+[ -n "${EVAL_READ_JOB_ID:-}" ] || fail "EVAL_READ_JOB_ID is not set for the verifier"
 [ -f "$ANSWER_FILE" ] || fail "answer file $ANSWER_FILE does not exist"
 
 # Trim trailing whitespace/newlines; the answer must be a single non-empty line.
@@ -38,13 +38,13 @@ answer="$(tr -d '\r' < "$ANSWER_FILE" | sed -e 's/[[:space:]]*$//' -e '/^$/d')"
 printf '%s' "$answer" | grep -Eq '^-?[0-9]+(\.[0-9]+)?$' \
     || fail "answer '$answer' is not a plain decimal number"
 
-truth="$(harbor hub job show "$EVAL_JOB_ID" --json 2>/dev/null \
+truth="$(harbor hub job show "$EVAL_READ_JOB_ID" --json 2>/dev/null \
     | python3 -c 'import json, sys; print((json.load(sys.stdin).get("stats") or {})["avg_reward"])' 2>/dev/null)" \
-    || fail "could not read job $EVAL_JOB_ID mean reward from the hub"
-[ -n "$truth" ] || fail "hub returned no mean reward for job $EVAL_JOB_ID"
+    || fail "could not read job $EVAL_READ_JOB_ID mean reward from the hub"
+[ -n "$truth" ] || fail "hub returned no mean reward for job $EVAL_READ_JOB_ID"
 
 awk -v got="$answer" -v want="$truth" \
     'BEGIN { d = got - want; if (d < 0) d = -d; exit !(d <= 1e-6) }' \
-    || fail "answer '$answer' does not match hub mean reward '$truth' (job $EVAL_JOB_ID)"
+    || fail "answer '$answer' does not match hub mean reward '$truth' (job $EVAL_READ_JOB_ID)"
 
 pass "answer '$answer' matches hub mean reward '$truth'"

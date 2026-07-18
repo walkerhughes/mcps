@@ -21,7 +21,7 @@ timeout_sec = 120.0
 # mean reward from the hub via the harbor CLI and compares (see tests/test.sh).
 [verifier.env]
 HARBOR_API_KEY = "${HARBOR_API_KEY:-}"
-EVAL_JOB_ID = "${EVAL_JOB_ID:-}"
+EVAL_READ_JOB_ID = "${EVAL_READ_JOB_ID:-}"
 
 [environment]
 build_timeout_sec = 900.0

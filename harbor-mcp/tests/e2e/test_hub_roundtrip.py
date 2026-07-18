@@ -25,9 +25,8 @@ pytestmark = [
     ),
 ]
 
-# The shared hello-world task lives under evals/ (it also backs the eval
-# runner's job bootstrap), so tests/ carries no duplicate fixture.
-FIXTURE_TASK = Path(__file__).resolve().parents[2] / "evals" / "hello-world"
+# Shared fixture (also backs the eval runners' job bootstrap); see its README.
+FIXTURE_TASK = Path(__file__).parent / "fixtures" / "hello-world"
 JOB_NAME = "harbor-mcp-e2e"
 RUN_TIMEOUT_SEC = 1200  # first run docker-builds the fixture image
 
