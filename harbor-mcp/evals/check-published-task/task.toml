@@ -1,0 +1,48 @@
+schema_version = "1.1"
+
+[task]
+name = "harbor-mcp/check-published-task"
+description = "Use the harbor-hub MCP server to check whether a task package is published on the hub."
+authors = []
+keywords = ["mcp", "harbor-hub", "eval"]
+
+[metadata]
+category = "mcp"
+difficulty = "easy"
+
+[agent]
+timeout_sec = 600.0
+
+[verifier]
+timeout_sec = 120.0
+
+# Resolved from the HOST environment when the verifier runs (empty when unset).
+# The verifier is self-truthing: with HARBOR_API_KEY it probes the hub via the
+# harbor CLI to decide the published truth for EVAL_TASK_REF (see tests/test.sh).
+[verifier.env]
+HARBOR_API_KEY = "${HARBOR_API_KEY:-}"
+EVAL_TASK_REF = "${EVAL_TASK_REF:-}"
+
+[environment]
+build_timeout_sec = 900.0
+cpus = 1
+memory_mb = 2048
+storage_mb = 10240
+gpus = 0
+# The agent's MCP server, the oracle, and the verifier all reach the Harbor hub
+# over the network. Modal blocks egress unless the policy is public (docker
+# allows it by default), so this is required for the modal env.
+network_mode = "public"
+
+# stdio transport: the server runs inside the main container, so this works on
+# both docker and modal (unlike the compose-sidecar pattern, which is
+# docker-only). The `harbor-mcp` command resolves because environment/Dockerfile
+# installs this repo. HARBOR_API_KEY reaches the server through the agent's
+# process environment (`harbor run --ae HARBOR_API_KEY=...`).
+[[environment.mcp_servers]]
+name = "harbor-hub"
+transport = "stdio"
+command = "harbor-mcp"
+args = []
+
+[solution.env]

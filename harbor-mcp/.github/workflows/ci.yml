@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --dev
+      - run: make lint
+      - run: make test
+
+  integration:
+    # Deterministic tool-use tests: the test process invokes the MCP tools
+    # directly over stdio (no agent, no Anthropic), talking to the live hub.
+    # Auto-skips if HARBOR_API_KEY is absent (e.g. fork PRs get no secrets).
+    runs-on: ubuntu-latest
+    env:
+      HARBOR_API_KEY: ${{ secrets.HARBOR_API_KEY }}
+      HARBOR_TEST_ORG: ${{ secrets.HARBOR_TEST_ORG }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --dev
+      - run: make test-integration
+
+  e2e:
+    # Full loop using harbor's oracle agent (runs solve.sh, no LLM), so still
+    # deterministic and Anthropic-free. The harbor job runs on Modal.
+    runs-on: ubuntu-latest
+    env:
+      HARBOR_API_KEY: ${{ secrets.HARBOR_API_KEY }}
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      HARBOR_TEST_ENV: modal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --dev --extra modal
+      - run: make test-e2e

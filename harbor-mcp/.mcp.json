@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "harbor-hub": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["-c", "set -a && source .env && set +a && exec uv run harbor-mcp"]
+    }
+  }
+}
