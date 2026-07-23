@@ -1,0 +1,22 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Environment variables
+.env
+
+# Coverage
+.coverage
+
+# Claude skills (local only)
+.claude/skills/
+
+# Proposed trades (local only)
+proposed-trades.md

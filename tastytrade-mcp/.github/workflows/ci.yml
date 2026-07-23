@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main, mcp-server-refactor]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint & typecheck
+        run: make check
+
+      - name: Coverage (unit + integration)
+        run: make coverage
+
+      - name: Validate eval task verifiers
+        run: make validate-tasks
