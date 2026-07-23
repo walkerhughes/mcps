@@ -1,1 +1,22 @@
 # mcps
+
+A collection of [Model Context Protocol](https://modelcontextprotocol.io) servers that give agents like [Claude Code](https://docs.anthropic.com/en/docs/claude-code) direct access to external services. Each server lives in its own subdirectory with its own setup, tests, and docs.
+
+| Server | What it connects to |
+|--------|---------------------|
+| [`tastytrade-mcp`](tastytrade-mcp/) | The [TastyTrade Open API](https://developer.tastytrade.com/getting-started/): brokerage account, market data, and order management (12 tools). |
+| [`harbor-mcp`](harbor-mcp/) | The [Harbor](https://www.harborframework.com) hub: evaluation jobs, trials, uploads, and published packages. |
+
+## Design
+
+These servers follow Honeycomb's [MCP, easy as 1-2-3](https://www.honeycomb.io/blog/mcp-easy-as-1-2-3) guidance: a few curated tools built around real questions rather than raw API endpoints, responses shaped for a model instead of a UI, and typed schemas that steer the model toward valid calls.
+
+## Layout
+
+Each server is self-contained. Its own `README.md` covers how to install and configure it for Claude Code, run its tests, and use its tools.
+
+```
+mcps/
+├── tastytrade-mcp/
+└── harbor-mcp/
+```

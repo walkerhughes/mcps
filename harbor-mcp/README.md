@@ -4,6 +4,8 @@ An [MCP](https://modelcontextprotocol.io) server for the [Harbor](https://www.ha
 
 It wraps Harbor's own async client classes (`HubClient`, `UploadDB`, `RegistryDB`, `Uploader`, `Downloader`, `Publisher`), so there is no separate API layer to maintain. Harbor reads `HARBOR_API_KEY` and handles token exchange itself.
 
+This lives in the [`mcps`](../) monorepo, consolidated from a standalone repo with full commit history preserved (`git log`/`git blame` resolve inside this directory).
+
 ## Setup
 
 ```bash
